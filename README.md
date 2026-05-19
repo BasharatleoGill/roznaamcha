@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RozNaamcha
+
+RozNaamcha is a production-ready daily finance tracker built with Next.js, TypeScript, Firebase Authentication, Firestore, Tailwind CSS, Recharts, CSV export, and PDF reporting.
+
+## Features
+
+- Email/password authentication and Google sign-in with Firebase Auth
+- Protected application routes and secure user sessions
+- Per-user Firestore data isolation
+- Real-time transaction, budget, and settings syncing
+- Dashboard totals, current balance, daily/weekly/monthly summaries, insights, and charts
+- Monthly calendar with daily income, expense, balance, and transaction drill-down
+- Transaction add/edit/delete, search, filtering, category filtering, date filtering, and sorting
+- Monthly budget limits, alert thresholds, progress indicators, and warnings
+- Monthly/yearly reports, category analytics, trends, and PDF export
+- CSV transaction export
+- Responsive premium UI with dark mode
+
+## Tech Stack
+
+- Next.js App Router
+- React 19
+- TypeScript
+- Firebase Auth
+- Firebase Firestore
+- Tailwind CSS v4
+- Recharts
+- React Hook Form + Zod
+- jsPDF + jspdf-autotable
+- next-themes
+- Sonner toasts
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create local environment variables:
+
+```bash
+copy .env.example .env.local
+```
+
+Fill `.env.local` with your Firebase web app config:
+
+```bash
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+Run the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Firebase Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a Firebase project.
+2. Add a Web App in Project Settings.
+3. Copy the Firebase web config into `.env.local`.
+4. Enable Authentication providers:
+   - Email/Password
+   - Google
+5. Create a Firestore database in production mode.
+6. Deploy `firestore.rules`.
+7. Deploy `firestore.indexes.json` if Firebase prompts for indexes.
 
-## Learn More
+Recommended Firebase CLI flow:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install -g firebase-tools
+firebase login
+firebase init firestore
+firebase deploy --only firestore:rules,firestore:indexes
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Firestore Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+users/{uid}
+  email
+  displayName
+  photoURL
+  createdAt
+  updatedAt
 
-## Deploy on Vercel
+users/{uid}/transactions/{transactionId}
+  userId
+  type              income | expense
+  amount            number
+  category          string
+  description       string
+  date              yyyy-MM-dd
+  time              HH:mm
+  createdAt
+  updatedAt
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+users/{uid}/budgets/{yyyy-MM}
+  userId
+  month             yyyy-MM
+  limit             number
+  alertAt           number
+  createdAt
+  updatedAt
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+users/{uid}/settings/profile
+  currency
+  updatedAt
+```
+
+The included Firestore rules only allow authenticated users to read or mutate documents under their own `users/{uid}` path.
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run typecheck
+npm run build
+npm run start
+npm run audit:prod
+```
+
+## Production Notes
+
+- Keep `.env.local` out of source control.
+- Configure authorized domains in Firebase Auth for local, preview, and production domains.
+- Set `NEXT_PUBLIC_APP_URL` to the deployed production origin so metadata, robots, and sitemap URLs are correct.
+- Keep `firestore.rules` and `firestore.indexes.json` deployed with every production release.
+- Security headers are configured in `next.config.ts`.
+- `robots.txt` and `sitemap.xml` are generated by the App Router.
+- The app uses an npm `overrides` entry to force a patched PostCSS version across the dependency graph.
+- For very large accounts, split reports by year/month and add additional Firestore date-range queries.
