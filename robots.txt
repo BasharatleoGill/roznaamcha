@@ -1,9 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: /dashboard
-Disallow: /calendar
-Disallow: /transactions
-Disallow: /reports
-Disallow: /settings
-
-Sitemap: https://basharatleogill.github.io/roznaamcha/sitemap.xml
