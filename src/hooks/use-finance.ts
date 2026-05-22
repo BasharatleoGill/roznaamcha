@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { db } from "@/lib/firebase";
 import { monthKey } from "@/lib/finance";
+import { useWorkspace } from "@/contexts/workspace-context";
 import {
   Budget,
   BudgetInput,
@@ -44,6 +45,7 @@ function mapTransactionDoc(
   return {
     id: item.id,
     userId,
+    workspaceId: data.workspaceId ? String(data.workspaceId) : undefined,
     type: data.type as Transaction["type"],
     amount: Number(data.amount || 0),
     category: data.category as Transaction["category"],
@@ -66,40 +68,42 @@ function mapTransactionDoc(
 }
 
 export function useFinance(userId?: string) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { activeWorkspaceId, loading: workspaceLoading } = useWorkspace();
+
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [settings, setSettings] = useState<UserSettings>(defaultSettings);
-  const [loading, setLoading] = useState(Boolean(userId));
+  const [firestoreLoading, setFirestoreLoading] = useState(Boolean(userId));
   const [error, setError] = useState<string | null>(null);
 
+  // Client-side workspace filter.  Returns an empty array while the workspace
+  // context is still bootstrapping so pages never flash pre-migration data.
+  const transactions = useMemo(() => {
+    if (workspaceLoading || !activeWorkspaceId) return [];
+    return allTransactions.filter((tx) => tx.workspaceId === activeWorkspaceId);
+  }, [allTransactions, activeWorkspaceId, workspaceLoading]);
+
   useEffect(() => {
-    if (!userId) {
-      return;
-    }
+    if (!userId) return;
 
     const transactionsRef = collection(db, "users", userId, "transactions");
     const budgetsRef = collection(db, "users", userId, "budgets");
     const settingsRef = doc(db, "users", userId, "settings", "profile");
-    const transactionsQuery = query(
-      transactionsRef,
-      orderBy("date", "desc"),
-      limit(2000),
-    );
 
     const unsubscribeTransactions = onSnapshot(
-      transactionsQuery,
+      query(transactionsRef, orderBy("date", "desc"), limit(2000)),
       (snapshot) => {
-        setTransactions(
+        setAllTransactions(
           sortTransactions(
             snapshot.docs.map((item) => mapTransactionDoc(item, userId)),
           ),
         );
         setError(null);
-        setLoading(false);
+        setFirestoreLoading(false);
       },
       (snapshotError) => {
         setError(snapshotError.message);
-        setLoading(false);
+        setFirestoreLoading(false);
       },
     );
 
@@ -140,9 +144,14 @@ export function useFinance(userId?: string) {
   const addTransaction = useCallback(
     async (input: TransactionInput) => {
       if (!userId) return;
+      if (!activeWorkspaceId) {
+        toast.error("No workspace is active. Please wait a moment and try again.");
+        return;
+      }
 
       const docRef = await addDoc(collection(db, "users", userId, "transactions"), {
         ...input,
+        workspaceId: activeWorkspaceId,
         userId,
         amount: Number(input.amount),
         createdAt: serverTimestamp(),
@@ -152,13 +161,14 @@ export function useFinance(userId?: string) {
       const savedTransaction: Transaction = {
         id: docRef.id,
         userId,
+        workspaceId: activeWorkspaceId,
         ...input,
         amount: Number(input.amount),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      setTransactions((current) =>
+      setAllTransactions((current) =>
         sortTransactions([
           savedTransaction,
           ...current.filter((item) => item.id !== docRef.id),
@@ -166,7 +176,7 @@ export function useFinance(userId?: string) {
       );
       toast.success("Transaction saved");
     },
-    [userId],
+    [userId, activeWorkspaceId],
   );
 
   const updateTransaction = useCallback(
@@ -179,16 +189,11 @@ export function useFinance(userId?: string) {
         updatedAt: serverTimestamp(),
       });
 
-      setTransactions((current) =>
+      setAllTransactions((current) =>
         sortTransactions(
           current.map((item) =>
             item.id === id
-              ? {
-                  ...item,
-                  ...input,
-                  amount: Number(input.amount),
-                  updatedAt: new Date(),
-                }
+              ? { ...item, ...input, amount: Number(input.amount), updatedAt: new Date() }
               : item,
           ),
         ),
@@ -203,7 +208,7 @@ export function useFinance(userId?: string) {
       if (!userId) return;
 
       await deleteDoc(doc(db, "users", userId, "transactions", id));
-      setTransactions((current) => current.filter((item) => item.id !== id));
+      setAllTransactions((current) => current.filter((item) => item.id !== id));
       toast.success("Transaction deleted");
     },
     [userId],
@@ -249,12 +254,18 @@ export function useFinance(userId?: string) {
     [budgets],
   );
 
+  // The page-level loading flag is true until BOTH Firestore data and the
+  // workspace context have finished initialising.  This prevents pages from
+  // rendering empty charts/tables while the workspace bootstrap is still
+  // running the one-time migration.
+  const loading = userId ? firestoreLoading || workspaceLoading : false;
+
   return {
     transactions,
     budgets,
     currentBudget,
     settings,
-    loading: userId ? loading : false,
+    loading,
     error,
     addTransaction,
     updateTransaction,

@@ -43,6 +43,8 @@ type CalendarViewProps = {
   onDelete: (transaction: Transaction) => void;
 };
 
+const MAX_INLINE_TX = 4;
+
 export function CalendarView({
   transactions,
   currencyCode,
@@ -100,7 +102,7 @@ export function CalendarView({
         <CardHeader className="m-0 border-b border-border p-4">
           <div>
             <CardTitle>{format(month, "MMMM yyyy")}</CardTitle>
-            <p className="mt-1 text-sm text-muted">Click any day to inspect or add entries</p>
+            <p className="mt-1 text-sm text-muted">Click any day to view or add entries</p>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -130,103 +132,202 @@ export function CalendarView({
             </Button>
           </div>
         </CardHeader>
+
         <div className="overflow-x-auto">
           <div className="min-w-225">
-            <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_11rem] border-b border-border bg-panel-soft text-center text-xs font-semibold uppercase text-muted">
+            {/* Column headers — matches PDF day-name header row */}
+            <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_11rem] border-b border-border bg-panel-soft">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <div key={day} className="px-2 py-3">
+                <div
+                  key={day}
+                  className="border-r border-border px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-widest text-muted"
+                >
                   {day}
                 </div>
               ))}
-              <div className="border-l border-border px-2 py-3">Week total</div>
+              <div className="border-l border-border px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-widest text-muted">
+                Weekly Total
+              </div>
             </div>
-            <div>
-              {weeks.map((week) => {
-                const weekTransactions = week.flatMap((day) => grouped[day.key] || []);
-                const weekSummary = getSummary(weekTransactions);
-                const weekLabel = `${format(week[0].date, "MMM d")} - ${format(
-                  week[week.length - 1].date,
-                  "MMM d",
-                )}`;
 
-                return (
-                  <div
-                    key={week[0].key}
-                    className="grid grid-cols-[repeat(7,minmax(0,1fr))_11rem]"
-                  >
+            {/* Week rows */}
+            {weeks.map((week) => {
+              const weekTransactions = week.flatMap((day) => grouped[day.key] || []);
+              const weekSummary = getSummary(weekTransactions);
+              const weekLabel = `${format(week[0].date, "MMM d")} – ${format(
+                week[week.length - 1].date,
+                "MMM d",
+              )}`;
+
+              return (
+                <div key={week[0].key} className="border-b border-border">
+                  {/* Day cells */}
+                  <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_11rem]">
                     {week.map((day) => {
                       const dayTransactions = grouped[day.key] || [];
-                      const summary = getSummary(dayTransactions);
                       const active = selectedDate === day.key;
+                      const isToday = isSameDay(day.date, new Date());
+                      const inlineTx = dayTransactions.slice(0, MAX_INLINE_TX);
+                      const overflow = dayTransactions.length - MAX_INLINE_TX;
 
                       return (
                         <button
                           key={day.key}
                           type="button"
                           aria-label={`Open transactions for ${format(day.date, "PPP")}`}
-                          className={cn(
-                            "min-h-32 border-b border-r border-border p-2 text-left transition hover:bg-panel-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
-                            !day.inMonth && "bg-panel-soft/45 text-muted",
-                            active && "bg-primary/10",
-                          )}
                           onClick={() => setSelectedDate(day.key)}
+                          className={cn(
+                            "group flex min-h-36 flex-col border-r border-border text-left transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+                            !day.inMonth && "bg-panel-soft/50",
+                            active && "bg-primary/10 ring-2 ring-inset ring-primary",
+                          )}
                         >
-                          <div className="flex items-center justify-between">
+                          {/* Date number row */}
+                          <div className="flex items-center justify-between px-2 pt-2 pb-1">
                             <span
                               className={cn(
-                                "grid h-7 w-7 place-items-center rounded-md text-sm font-semibold",
-                                isSameDay(day.date, new Date()) &&
-                                  "bg-primary text-primary-foreground",
+                                "flex h-6 w-6 items-center justify-center rounded text-sm font-bold leading-none",
+                                isToday && "bg-primary text-primary-foreground",
+                                !isToday && day.inMonth && "text-foreground",
+                                !isToday && !day.inMonth && "text-muted/50",
                               )}
                             >
                               {format(day.date, "d")}
                             </span>
-                            {dayTransactions.length ? <Badge>{dayTransactions.length}</Badge> : null}
+                            {dayTransactions.length > 0 && (
+                              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-primary">
+                                {dayTransactions.length}
+                              </span>
+                            )}
                           </div>
-                          <div className="mt-3 grid gap-1 text-xs">
-                            {summary.income ? (
-                              <span className="text-income">
-                                +{fmtCurrency(summary.income, currencyCode)}
-                              </span>
-                            ) : null}
-                            {summary.expense ? (
-                              <span className="text-expense">
-                                -{fmtCurrency(summary.expense, currencyCode)}
-                              </span>
-                            ) : null}
-                            {summary.count ? (
-                              <span className="font-semibold">
-                                {fmtCurrency(summary.balance, currencyCode)}
-                              </span>
-                            ) : null}
+
+                          {/* DESCRIPTION / AMOUNT sub-header — matches PDF column label */}
+                          <div className="grid grid-cols-[1fr_auto] gap-1 border-t border-border/50 px-2 py-0.5">
+                            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-muted/60">
+                              Description
+                            </span>
+                            <span className="text-[8.5px] font-semibold uppercase tracking-wider text-muted/60">
+                              Amount
+                            </span>
+                          </div>
+
+                          {/* Inline transaction list */}
+                          <div className="flex-1 space-y-px px-2 py-0.5">
+                            {inlineTx.map((tx) => (
+                              <div
+                                key={tx.id}
+                                className="grid grid-cols-[1fr_auto] gap-1 text-[10px]"
+                              >
+                                <span
+                                  className={cn(
+                                    "truncate",
+                                    !day.inMonth && "opacity-60",
+                                  )}
+                                >
+                                  {tx.category}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "tabular-nums font-medium",
+                                    tx.type === "income" ? "text-income" : "text-expense",
+                                  )}
+                                >
+                                  {fmtCurrency(tx.amount, currencyCode)}
+                                </span>
+                              </div>
+                            ))}
+                            {overflow > 0 && (
+                              <p className="text-[9px] text-muted">+{overflow} more…</p>
+                            )}
                           </div>
                         </button>
                       );
                     })}
+
+                    {/* Week total panel — right column */}
                     <div
-                      className="min-h-32 border-b border-l border-border bg-panel-soft/55 p-3"
-                      aria-label={`Weekly income and expense for ${weekLabel}`}
+                      className="flex flex-col border-l border-border bg-panel-soft/60 p-3"
+                      aria-label={`Weekly totals for ${weekLabel}`}
                     >
-                      <p className="text-xs font-semibold uppercase text-muted">{weekLabel}</p>
-                      <div className="mt-4 grid gap-2 text-sm tabular-nums">
+                      <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-muted">
+                        {weekLabel}
+                      </p>
+                      <div className="flex flex-1 flex-col justify-center gap-2 text-xs tabular-nums">
                         <div>
-                          <p className="text-xs text-muted">Income</p>
-                          <p className="truncate font-semibold text-income">
+                          <p className="text-[9px] text-muted">Income</p>
+                          <p className="font-bold text-income">
                             +{fmtCurrency(weekSummary.income, currencyCode)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted">Expense</p>
-                          <p className="truncate font-semibold text-expense">
-                            -{fmtCurrency(weekSummary.expense, currencyCode)}
+                          <p className="text-[9px] text-muted">Expense</p>
+                          <p className="font-bold text-expense">
+                            −{fmtCurrency(weekSummary.expense, currencyCode)}
+                          </p>
+                        </div>
+                        <div className="border-t border-border/60 pt-1.5">
+                          <p className="text-[9px] text-muted">Net</p>
+                          <p
+                            className={cn(
+                              "font-bold tabular-nums",
+                              weekSummary.balance < 0 ? "text-expense" : "text-income",
+                            )}
+                          >
+                            {fmtCurrency(weekSummary.balance, currencyCode)}
                           </p>
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* TOTAL row — matches the PDF's per-week TOTAL band */}
+                  <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_11rem] border-t border-border/70 bg-panel-soft/40">
+                    {week.map((day, i) => {
+                      const dayTransactions = grouped[day.key] || [];
+                      const daySummary = getSummary(dayTransactions);
+                      const hasData = daySummary.count > 0;
+
+                      return (
+                        <div
+                          key={day.key}
+                          className="flex items-center gap-1.5 border-r border-border/60 px-2 py-1.5"
+                        >
+                          {i === 0 && (
+                            <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-primary">
+                              Total
+                            </span>
+                          )}
+                          <span
+                            className={cn(
+                              "text-[10px] tabular-nums font-semibold",
+                              !hasData && "text-muted/50",
+                              hasData && daySummary.balance < 0 && "text-expense",
+                              hasData && daySummary.balance >= 0 && daySummary.income > 0 && "text-income",
+                              hasData && daySummary.balance === 0 && daySummary.income === 0 && "text-muted/50",
+                            )}
+                          >
+                            {hasData ? fmtCurrency(daySummary.balance, currencyCode) : "$0.00"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {/* Weekly net in last column */}
+                    <div className="border-l border-border/60 px-2 py-1.5">
+                      <span
+                        className={cn(
+                          "text-[10px] tabular-nums font-bold",
+                          weekSummary.count === 0 && "text-muted/50",
+                          weekSummary.count > 0 && weekSummary.balance < 0 && "text-expense",
+                          weekSummary.count > 0 && weekSummary.balance >= 0 && "text-income",
+                        )}
+                      >
+                        {weekSummary.count ? fmtCurrency(weekSummary.balance, currencyCode) : "$0.00"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </Card>
@@ -240,11 +341,15 @@ export function CalendarView({
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-md bg-income/10 p-3">
               <p className="text-xs text-muted">Income</p>
-              <p className="font-semibold text-income">{fmtCurrency(selectedSummary.income, currencyCode)}</p>
+              <p className="font-semibold text-income">
+                {fmtCurrency(selectedSummary.income, currencyCode)}
+              </p>
             </div>
             <div className="rounded-md bg-expense/10 p-3">
               <p className="text-xs text-muted">Expense</p>
-              <p className="font-semibold text-expense">{fmtCurrency(selectedSummary.expense, currencyCode)}</p>
+              <p className="font-semibold text-expense">
+                {fmtCurrency(selectedSummary.expense, currencyCode)}
+              </p>
             </div>
             <div className="rounded-md bg-panel-soft p-3">
               <p className="text-xs text-muted">Balance</p>
@@ -264,27 +369,42 @@ export function CalendarView({
           </Button>
           <div className="grid gap-2">
             {selectedTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+              <div
+                key={transaction.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-border p-3"
+              >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Badge tone={transaction.type === "income" ? "income" : "expense"}>{transaction.type}</Badge>
+                    <Badge tone={transaction.type === "income" ? "income" : "expense"}>
+                      {transaction.type}
+                    </Badge>
                     <span className="font-semibold">{transaction.category}</span>
                   </div>
-                  <p className="mt-1 truncate text-sm text-muted">{transaction.description || transaction.time}</p>
+                  <p className="mt-1 truncate text-sm text-muted">
+                    {transaction.description || transaction.time}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold">{fmtCurrency(transaction.amount, currencyCode)}</span>
+                  <span className="font-semibold">
+                    {fmtCurrency(transaction.amount, currencyCode)}
+                  </span>
                   <Button variant="ghost" className="h-8 px-2" onClick={() => onEdit(transaction)}>
                     Edit
                   </Button>
-                  <Button variant="ghost" className="h-8 px-2 text-expense" onClick={() => onDelete(transaction)}>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 text-expense"
+                    onClick={() => onDelete(transaction)}
+                  >
                     Delete
                   </Button>
                 </div>
               </div>
             ))}
             {!selectedTransactions.length ? (
-              <p className="rounded-md bg-panel-soft p-4 text-sm text-muted">No entries on this date yet.</p>
+              <p className="rounded-md bg-panel-soft p-4 text-sm text-muted">
+                No entries on this date yet.
+              </p>
             ) : null}
           </div>
         </div>

@@ -20,6 +20,8 @@ import { useTheme } from "next-themes";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useHideValues } from "@/contexts/hide-values-context";
+import { useWorkspace } from "@/contexts/workspace-context";
+import { WorkspaceSwitcher } from "@/components/finance/workspace-switcher";
 import { TransactionForm } from "@/components/finance/transaction-form";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { resolvedTheme, setTheme } = useTheme();
   const { hidden, toggle: toggleHidden } = useHideValues();
   const finance = useFinance(user?.uid);
+  const { activeWorkspace } = useWorkspace();
   const [fabOpen, setFabOpen] = useState(false);
 
   const activeTitle = useMemo(
@@ -60,6 +63,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-semibold leading-tight">RozNaamcha</p>
             <p className="text-xs text-muted">Daily finance tracker</p>
           </div>
+        </div>
+
+        {/* Workspace switcher */}
+        <div className="border-b border-border px-3 py-2">
+          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted/60">
+            Workspace
+          </p>
+          <WorkspaceSwitcher />
         </div>
 
         {/* Nav */}
@@ -136,6 +147,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 RozNaamcha
               </p>
               <h1 className="truncate text-xl font-semibold">{activeTitle}</h1>
+              {activeWorkspace && (
+                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ background: activeWorkspace.color }}
+                    aria-hidden="true"
+                  />
+                  {activeWorkspace.name}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button

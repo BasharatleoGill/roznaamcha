@@ -21,6 +21,7 @@ export type TransactionCategory =
 export type Transaction = {
   id: string;
   userId: string;
+  workspaceId?: string;
   type: TransactionType;
   amount: number;
   category: TransactionCategory;
