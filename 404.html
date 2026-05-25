@@ -1,28 +1,46 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>RozNaamcha</title>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/roznaamcha/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="RozNaamcha — daily finance tracker for income, expenses, budgets, and reports. Keep your money clear." />
+    <meta name="theme-color" content="#10b981" />
+    <meta property="og:title" content="RozNaamcha | Daily Finance Tracker" />
+    <meta property="og:description" content="Track income, expenses, budgets, and reports. Personal finance made simple." />
+    <meta property="og:type" content="website" />
+    <title>RozNaamcha | Daily Finance Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script>
-      var segmentCount = 1;
-      var locationPath = window.location.pathname
-        .split("/")
-        .slice(0, 1 + segmentCount)
-        .join("/");
-      var routePath = window.location.pathname
-        .slice(1)
-        .split("/")
-        .slice(segmentCount)
-        .join("/");
-      window.location.replace(
-        window.location.origin +
-          locationPath +
-          "/?/" +
-          routePath +
-          window.location.search.replace("?", "&") +
-          window.location.hash
-      );
+      (function () {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+        var query = window.location.search;
+        if (query.indexOf("?/") === 0) {
+          var decoded = query
+            .slice(2)
+            .split("&")
+            .join("?")
+            .replace(/~and~/g, "&");
+          history.replaceState(null, null, window.location.pathname.replace(/\/$/, "") + "/" + decoded + window.location.hash);
+        }
+      })();
     </script>
+    <script type="module" crossorigin src="/roznaamcha/assets/index-CDBbdbFQ.js"></script>
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/rolldown-runtime-QTnfLwEv.js">
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/firebase-DdMHyKUU.js">
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/charts-BEXi-6cz.js">
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/createLucideIcon-Bt28UsVV.js">
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/Button-Ce5cQJmP.js">
+    <link rel="modulepreload" crossorigin href="/roznaamcha/assets/AuthContext-9sLXdDxI.js">
+    <link rel="stylesheet" crossorigin href="/roznaamcha/assets/index-BbdMljd7.css">
   </head>
-  <body></body>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
